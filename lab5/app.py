@@ -1,92 +1,153 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
+import os
+import urllib.request
+import datetime
 import matplotlib.pyplot as plt
+import ssl
+import io
 
-# Налаштування сторінки
-st.set_page_config(layout="wide", page_title="Лабораторна 5: Наука про дані: обмін результатами та початковий аналіз")
+ssl._create_default_https_context = ssl._create_unverified_context
+st.set_page_config(layout="wide", page_title="Лабораторна 5: VHI/VCI/TCI")
 
-# Імітація даних з 2-ї лабораторної роботи для швидкого старту програми
-@st.cache_data
+dict_obl = {
+    1: 'Вінницька', 2: 'Волинська', 3: 'Дніпропетровська', 4: 'Донецька', 5: 'Житомирська',
+    6: 'Закарпатська', 7: 'Запорізька', 8: 'Івано-Франківська', 9: 'Київська', 10: 'Кіровоградська',
+    11: 'Луганська', 12: 'Львівська', 13: 'Миколаївська', 14: 'Одеська', 15: 'Полтавська',
+    16: 'Рівненська', 17: 'Сумська', 18: 'Тернопільська', 19: 'Харківська', 20: 'Херсонська',
+    21: 'Хмельницька', 22: 'Черкаська', 23: 'Чернівецька', 24: 'Чернігівська', 25: 'Республіка Крим'
+}
+
+@st.cache_data(show_spinner="Читання даних...")
 def load_data():
-    np.random.seed(42)
-    provinces = ['Київська', 'Вінницька', 'Одеська', 'Львівська', 'Харківська', 'Дніпропетровська']
-    years = list(range(2000, 2024))
-    weeks = list(range(1, 53))
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    output_dir = os.path.join(current_dir, "vhi_data")
     
-    data = []
-    for p in provinces:
-        for y in years:
-            for w in weeks:
-                data.append([p, y, w])
-    df = pd.DataFrame(data, columns=['Province', 'Year', 'Week'])
-    df['VCI'] = np.random.uniform(10, 100, len(df))
-    df['TCI'] = np.random.uniform(10, 100, len(df))
-    df['VHI'] = df['VCI'] * 0.5 + df['TCI'] * 0.5
-    return df
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    current_year = datetime.datetime.now().year
+    df_list = []
+    
+    for province_id in range(1, 28):
+        existing_files = [f for f in os.listdir(output_dir) if f.startswith(f"vhi_id_{province_id}_")]
+        if not existing_files:
+            url = f"https://www.star.nesdis.noaa.gov/smcd/emb/vci/VH/get_TS_admin.php?country=UKR&provinceID={province_id}&year1=1981&year2={current_year}&type=Mean"
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                wp = urllib.request.urlopen(req, timeout=10)
+                text = wp.read()
+                if b"Request Rejected" not in text:
+                    now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                    filename = f"vhi_id_{province_id}_{now}.csv"
+                    filepath = os.path.join(output_dir, filename)
+                    with open(filepath, 'wb') as f:
+                        f.write(text)
+            except Exception:
+                pass
+
+    for filename in os.listdir(output_dir):
+        if filename.endswith(".csv"):
+            filepath = os.path.join(output_dir, filename)
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    text = f.read()
+                
+                text = text.replace('<tt><pre>', '').replace('</pre></tt>', '').replace('<br>', '')
+                
+                df = pd.read_csv(io.StringIO(text), skiprows=2, header=None, 
+                                 names=['Year', 'Week', 'SMN', 'SMT', 'VCI', 'TCI', 'VHI', 'empty'])
+                df.drop(columns=['empty'], inplace=True, errors='ignore')
+                df = df.dropna()
+                
+                df = df[df['Year'].apply(lambda x: str(x).strip().isdigit())]
+                df['Year'] = df['Year'].astype(int)
+                
+                obl_id = int(filename.split('_')[2])
+                new_obl_id = obl_id
+                if obl_id == 1: new_obl_id = 22
+                elif obl_id == 2: new_obl_id = 24
+                elif obl_id == 3: new_obl_id = 23
+                elif obl_id == 4: new_obl_id = 25
+                elif obl_id == 5: new_obl_id = 3
+                elif obl_id == 6: new_obl_id = 4
+                elif obl_id == 7: new_obl_id = 8
+                elif obl_id == 8: new_obl_id = 19
+                elif obl_id == 9: new_obl_id = 20
+                elif obl_id == 10: new_obl_id = 21
+                elif obl_id == 11: new_obl_id = 9
+                elif obl_id == 12: new_obl_id = 26 
+                elif obl_id == 13: new_obl_id = 10
+                elif obl_id == 14: new_obl_id = 11
+                elif obl_id == 15: new_obl_id = 12
+                elif obl_id == 16: new_obl_id = 13
+                elif obl_id == 17: new_obl_id = 14
+                elif obl_id == 18: new_obl_id = 15
+                elif obl_id == 19: new_obl_id = 16
+                elif obl_id == 20: new_obl_id = 27 
+                elif obl_id == 21: new_obl_id = 17
+                elif obl_id == 22: new_obl_id = 18
+                elif obl_id == 23: new_obl_id = 6
+                elif obl_id == 24: new_obl_id = 1
+                elif obl_id == 25: new_obl_id = 2
+                elif obl_id == 26: new_obl_id = 7
+                elif obl_id == 27: new_obl_id = 5
+                
+                df['Province'] = dict_obl.get(new_obl_id, "Невідома область")
+                df_list.append(df)
+            except Exception:
+                pass
+
+    if not df_list:
+        return pd.DataFrame()
+        
+    final_df = pd.concat(df_list, ignore_index=True)
+    final_df = final_df[final_df['Province'] != "Невідома область"]
+    final_df = final_df[final_df['VHI'] >= 0]
+    return final_df
 
 df = load_data()
 
-# ---------------------------------------------------------
-# Вимога: створіть button для скидання всіх фільтрів і повернення до початкового стану
-# ---------------------------------------------------------
+if df.empty:
+    st.error("Помилка: дані не знайдено.")
+    st.stop()
+
 def reset_filters():
     st.session_state.indicator = 'VHI'
-    st.session_state.province = 'Київська'
+    st.session_state.province = sorted(df['Province'].unique())[0] 
     st.session_state.week_range = (1, 52)
-    st.session_state.year_range = (2000, 2023)
+    st.session_state.year_range = (int(df['Year'].min()), int(df['Year'].max()))
     st.session_state.sort_asc = False
     st.session_state.sort_desc = False
 
-# Ініціалізація початкових значень (щоб програма знала, з чого починати)
 if 'indicator' not in st.session_state:
     reset_filters()
 
-st.title("Лабораторна робота №5" + "\n" + "Наука про дані: обмін результатами та початковий аналіз")
+st.title("Аналіз вегетаційних індексів (Лабораторна 5)")
 
-# ---------------------------------------------------------
-# Вимога: інтерактивні елементи мають бути розміщені в одній колонці, а графіки з таблицею — в іншій.
-# ---------------------------------------------------------
 col_controls, col_graphs = st.columns([1, 3])
 
 with col_controls:
     st.header("Налаштування")
-    
-    # Вимога: створіть dropdown список, який дозволяє вибрати часовий ряд VCI, TCI, VHI
     indicator = st.selectbox("Показник", ["VCI", "TCI", "VHI"], key='indicator')
-    
-    # Вимога: створіть dropdown список, який дозволяє вибрати область
-    province = st.selectbox("Область", df['Province'].unique(), key='province')
-    
-    # Вимога: створіть slider, який дозволяє вибирати інтервал тижнів
+    province_list = sorted(df['Province'].unique())
+    province = st.selectbox("Область", province_list, key='province')
     week_range = st.slider("Інтервал тижнів", 1, 52, key='week_range')
-    
-    # Вимога: створіть slider, який дозволяє вибрати інтервал років
-    year_range = st.slider("Інтервал років", 2000, 2023, key='year_range')
-    
-    # Вимога: створіть два checkbox для сортування даних за зростанням та спаданням
+    min_year = int(df['Year'].min())
+    max_year = int(df['Year'].max())
+    year_range = st.slider("Інтервал років", min_year, max_year, key='year_range')
     st.subheader("Сортування")
     sort_asc = st.checkbox("За зростанням", key='sort_asc')
     sort_desc = st.checkbox("За спаданням", key='sort_desc')
-    
     st.markdown("---")
-    # Та сама кнопка Reset, про яку йшла мова вище
     st.button("Reset (Скинути фільтри)", on_click=reset_filters, type="primary")
 
 with col_graphs:
-    # Фільтруємо дані на основі повзунків і випадаючих списків
-    mask = (
-        (df['Province'] == province) &
-        (df['Week'] >= week_range[0]) & (df['Week'] <= week_range[1]) &
-        (df['Year'] >= year_range[0]) & (df['Year'] <= year_range[1])
-    )
+    mask = ((df['Province'] == province) & (df['Week'] >= week_range[0]) & (df['Week'] <= week_range[1]) & (df['Year'] >= year_range[0]) & (df['Year'] <= year_range[1]))
     filtered_df = df[mask].copy()
     
-    # ---------------------------------------------------------
-    # Вимога: продумайте реакцію програми, якщо увімкнені обидва чекбокси.
-    # ---------------------------------------------------------
     if sort_asc and sort_desc:
-        st.warning("Увімкнено одночасно сортування за зростанням та спаданням! Сортування скинуто до стандартного хронологічного (Рік -> Тиждень).")
+        st.warning("Увімкнено одночасно сортування за зростанням та спаданням! Сортування скинуто до стандартного (Рік -> Тиждень).")
         filtered_df = filtered_df.sort_values(by=['Year', 'Week'])
     elif sort_asc:
         filtered_df = filtered_df.sort_values(by=indicator, ascending=True)
@@ -95,23 +156,15 @@ with col_graphs:
     else:
         filtered_df = filtered_df.sort_values(by=['Year', 'Week'])
 
-    # ---------------------------------------------------------
-    # Вимога: створіть три вкладки для відображення таблиці, графіка та графіка порівняння.
-    # ---------------------------------------------------------
-    tab1, tab2, tab3 = st.tabs(["Таблиця даних", "Графік показника", "Порівняння областей"])
+    tab1, tab2, tab3 = st.tabs(["📊 Таблиця даних", "📈 Графік показника", "🌍 Порівняння областей"])
     
     with tab1:
         st.subheader(f"Відфільтровані дані для області: {province}")
-        # Виводимо таблицю
         st.dataframe(filtered_df[['Year', 'Week', 'Province', indicator]], use_container_width=True)
         
     with tab2:
-        # Вимога: перший графік повинен відображати відфільтровані дані (часові ряди)
         st.subheader(f"Динаміка {indicator} ({year_range[0]}-{year_range[1]})")
-        
-        # Для красивого лінійного графіка рахуємо середнє значення показника за обрані тижні у кожному році
         yearly_data = filtered_df.groupby('Year')[indicator].mean().reset_index()
-        
         fig, ax = plt.subplots(figsize=(10, 4))
         ax.plot(yearly_data['Year'], yearly_data[indicator], marker='o', color='#2ca02c', linewidth=2)
         ax.set_xlabel('Рік')
@@ -120,30 +173,18 @@ with col_graphs:
         st.pyplot(fig)
         
     with tab3:
-        # Вимога: другий графік має відображати порівняння значень для обраної області з усіма іншими
         st.subheader(f"Порівняння {indicator}: {province} та інші області")
-        
-        # Відбираємо дані для ВСІХ областей, але застосовуємо фільтри років і тижнів
-        mask_all = (
-            (df['Week'] >= week_range[0]) & (df['Week'] <= week_range[1]) &
-            (df['Year'] >= year_range[0]) & (df['Year'] <= year_range[1])
-        )
+        mask_all = ((df['Week'] >= week_range[0]) & (df['Week'] <= week_range[1]) & (df['Year'] >= year_range[0]) & (df['Year'] <= year_range[1]))
         df_all_filtered = df[mask_all]
-        
-        # Рахуємо середнє по кожній області
         comparison_data = df_all_filtered.groupby(['Year', 'Province'])[indicator].mean().unstack()
-        
         fig2, ax2 = plt.subplots(figsize=(10, 5))
         for col in comparison_data.columns:
             if col == province:
-                # Обрану область виділяємо товстою лінією
                 ax2.plot(comparison_data.index, comparison_data[col], lw=3, label=f'{col} (Вибрана)', zorder=5)
             else:
-                # Інші області малюємо тонкими напівпрозорими лініями
                 ax2.plot(comparison_data.index, comparison_data[col], lw=1, alpha=0.4, label=col)
-        
         ax2.set_xlabel('Рік')
         ax2.set_ylabel(f'Середній {indicator}')
-        ax2.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        ax2.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small', ncol=2)
         ax2.grid(True, linestyle='--', alpha=0.6)
         st.pyplot(fig2)
