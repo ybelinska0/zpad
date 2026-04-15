@@ -1,0 +1,3 @@
+/home/ilomilo/lab6/zpad6/build/CMakeFiles/lab6_app.dir
+/home/ilomilo/lab6/zpad6/build/CMakeFiles/edit_cache.dir
+/home/ilomilo/lab6/zpad6/build/CMakeFiles/rebuild_cache.dir
